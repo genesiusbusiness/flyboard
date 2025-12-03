@@ -6,17 +6,14 @@ const nextConfig = {
   compress: true,
   // Optimisations
   swcMinify: true,
-  // Output export pour S3 statique (désactivé temporairement)
-  // output: 'export',
+  // Output standalone pour AWS Amplify
+  output: 'standalone',
   // Images
   images: {
-    unoptimized: true, // Pour S3 statique
+    unoptimized: true,
   },
-  // Trailing slash pour S3
+  // Trailing slash
   trailingSlash: false,
-  // Configuration pour les routes dynamiques avec export statique
-  // Note: Les routes dynamiques nécessitent generateStaticParams dans chaque segment
-  // Pour S3 statique, nous utilisons le routing côté client uniquement
 }
 
 module.exports = nextConfig
