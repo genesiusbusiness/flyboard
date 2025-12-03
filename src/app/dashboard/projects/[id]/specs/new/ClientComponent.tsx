@@ -1,6 +1,5 @@
 "use client";
 
-"use client";
 
 import { Navigation } from "@/components/Navigation";
 import { GlassCard } from "@/components/GlassCard";
