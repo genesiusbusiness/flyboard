@@ -1,10 +1,8 @@
 import React from 'react';
 
-export const dynamicParams = false;
-
 export async function generateStaticParams() {
   // Pour un export statique, on retourne un tableau vide
-  // Le routing sera géré côté client
+  // Le routing sera géré côté client avec Next.js router
   return [];
 }
 

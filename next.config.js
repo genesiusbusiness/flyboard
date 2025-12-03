@@ -6,6 +6,8 @@ const nextConfig = {
   compress: true,
   // Optimisations
   swcMinify: true,
+  // Export statique pour déploiement sur hébergeur statique
+  output: 'export',
   // Images
   images: {
     unoptimized: true,
