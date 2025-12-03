@@ -4,11 +4,9 @@ const nextConfig = {
   // Configuration pour la production
   poweredByHeader: false,
   compress: true,
-  // Export statique pour déploiement sur hébergeur statique
-  output: 'export',
-  // Images
+  // Images (Vercel optimise automatiquement)
   images: {
-    unoptimized: true,
+    domains: ['xlzrywplyqpyvkcipgei.supabase.co'],
   },
   // Trailing slash
   trailingSlash: false,
