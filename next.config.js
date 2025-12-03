@@ -4,8 +4,6 @@ const nextConfig = {
   // Configuration pour la production
   poweredByHeader: false,
   compress: true,
-  // Optimisations
-  swcMinify: true,
   // Export statique pour déploiement sur hébergeur statique
   output: 'export',
   // Images
