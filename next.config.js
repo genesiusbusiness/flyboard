@@ -6,8 +6,6 @@ const nextConfig = {
   compress: true,
   // Optimisations
   swcMinify: true,
-  // Output standalone pour AWS Amplify
-  output: 'standalone',
   // Images
   images: {
     unoptimized: true,
