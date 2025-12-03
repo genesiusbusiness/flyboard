@@ -6,6 +6,8 @@ const nextConfig = {
   compress: true,
   // Optimisations
   swcMinify: true,
+  // Export statique pour Amplify Hosting (gratuit)
+  output: 'export',
   // Images
   images: {
     unoptimized: true,
