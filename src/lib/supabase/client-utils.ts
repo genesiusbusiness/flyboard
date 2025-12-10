@@ -1010,6 +1010,8 @@ export async function getProjectUserRole(projectId: string): Promise<{
   canCreateProposals: boolean;
   canCreateNotes: boolean;
   canManageMembers: boolean;
+  canCreateSpecs: boolean;
+  canEditSpecs: boolean;
 }> {
   const supabase = createClient();
   
@@ -1026,6 +1028,8 @@ export async function getProjectUserRole(projectId: string): Promise<{
       canCreateProposals: false,
       canCreateNotes: false,
       canManageMembers: false,
+      canCreateSpecs: false,
+      canEditSpecs: false,
     };
   }
 
