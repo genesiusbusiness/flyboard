@@ -8,7 +8,7 @@ import { ArrowLeft, FileText, Users, Plus, Edit, CheckCircle, XCircle, Clock, Tr
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getProject, bootstrapFlyboardProfile, getProjectSpecs, getProjectMembers, getProjectProposals, deleteProject } from "@/lib/supabase/client-utils";
+import { getProject, bootstrapFlyboardProfile, getProjectSpecs, getProjectMembers, getProjectProposals, deleteProject, getProjectUserRole } from "@/lib/supabase/client-utils";
 
 export default function ProjectDetail() {
   const params = useParams();
