@@ -30,6 +30,8 @@ export default function ProjectDetail() {
     canCreateProposals: boolean;
     canCreateNotes: boolean;
     canManageMembers: boolean;
+    canCreateSpecs: boolean;
+    canEditSpecs: boolean;
   } | null>(null);
   const [proposals, setProposals] = useState<any[]>([]);
   const [loadingProposals, setLoadingProposals] = useState(false);
