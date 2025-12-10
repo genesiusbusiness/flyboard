@@ -132,14 +132,15 @@ export default function SpecsPage() {
               </h1>
               <p className="text-gray-600">Gérez tous les cahiers des charges de ce projet</p>
             </div>
-            <Link
-              href={`/dashboard/projects/${projectId}/specs/new`}
-              className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              Nouveau cahier des charges
-            </Link>
-          )}
+            {permissions?.canCreateSpecs && (
+              <Link
+                href={`/dashboard/projects/${projectId}/specs/new`}
+                className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Nouveau cahier des charges
+              </Link>
+            )}
           </div>
 
           {/* Filtres par catégorie */}
