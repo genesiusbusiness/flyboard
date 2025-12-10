@@ -65,8 +65,6 @@ export default function EditSpecs() {
     } catch (error) {
       console.error("Erreur lors de la vérification des permissions:", error);
       router.push(`/dashboard/projects/${projectId}/specs/${specId}`);
-    } finally {
-      setCheckingPermissions(false);
     }
   };
 
