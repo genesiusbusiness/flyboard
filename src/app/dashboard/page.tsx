@@ -3,12 +3,12 @@
 import { Navigation } from "@/components/Navigation";
 import { Footer } from "@/components/Footer";
 import { useState, useEffect } from "react";
-import { Plus, FolderKanban, FileText, Users, Clock, CheckCircle, Sparkles } from "lucide-react";
+import { Plus, FolderKanban, FileText, Users, Clock, CheckCircle, Sparkles, Trash2, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
-import { bootstrapFlyboardProfile } from "@/lib/supabase/client-utils";
+import { bootstrapFlyboardProfile, deleteProject } from "@/lib/supabase/client-utils";
 
 interface Project {
   id: string;
@@ -18,6 +18,7 @@ interface Project {
   priority: string;
   created_at: string;
   deadline: string | null;
+  owner_id: string;
 }
 
 export default function Dashboard() {
@@ -26,6 +27,9 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ projectId: string; title: string } | null>(null);
+  const [projectOwners, setProjectOwners] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     checkAuthAndLoad();
@@ -105,6 +109,14 @@ export default function Dashboard() {
       );
 
       setProjects(uniqueProjects);
+
+      // Créer un map des propriétaires pour vérifier les permissions
+      const ownersMap: Record<string, boolean> = {};
+      const currentProfile = await bootstrapFlyboardProfile();
+      uniqueProjects.forEach((p: any) => {
+        ownersMap[p.id] = p.owner_id === profileId || currentProfile?.global_role === 'super_admin';
+      });
+      setProjectOwners(ownersMap);
     } catch (error) {
       console.error("Erreur lors du chargement des projets:", error);
       setProjects([]);
@@ -159,6 +171,32 @@ export default function Dashboard() {
         return "bg-gray-400";
     }
   };
+
+  const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowDeleteConfirm({ projectId: project.id, title: project.title });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!showDeleteConfirm) return;
+
+    const { projectId, title } = showDeleteConfirm;
+    setDeletingProjectId(projectId);
+    
+    try {
+      await deleteProject(projectId);
+      // Recharger les projets
+      await loadProjects();
+      setShowDeleteConfirm(null);
+    } catch (error: any) {
+      console.error('Erreur lors de la suppression:', error);
+      alert('Erreur lors de la suppression du projet: ' + (error.message || 'Erreur inconnue'));
+    } finally {
+      setDeletingProjectId(null);
+    }
+  };
+
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -301,47 +339,61 @@ export default function Dashboard() {
                     variants={itemVariants}
                     whileHover={{ y: -4, scale: 1.02 }}
                     transition={{ duration: 0.2 }}
+                    className="relative group"
                   >
-                    <Link href={`/dashboard/projects/${project.id}`}>
-                      <div className="glass-card rounded-2xl p-6 h-full cursor-pointer group hover:shadow-2xl transition-all duration-300">
-                        {/* Header avec priorité */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(project.status)}`}>
-                            {getStatusLabel(project.status)}
-                          </div>
-                          <div className={`w-3 h-3 rounded-full ${getPriorityDot(project.priority)}`} />
-                        </div>
-
-                        {/* Titre */}
-                        <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:vibrant-accent-text transition-colors">
-                          {project.title}
-                        </h3>
-
-                        {/* Description */}
-                        {project.description && (
-                          <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                            {project.description}
-                          </p>
-                        )}
-
-                        {/* Footer */}
-                        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                          {project.deadline && (
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                              <Clock className="w-4 h-4" />
-                              {new Date(project.deadline).toLocaleDateString("fr-FR", {
-                                day: "numeric",
-                                month: "short",
-                              })}
+                    <div className="glass-card rounded-2xl p-6 h-full hover:shadow-2xl transition-all duration-300 relative">
+                      {/* Bouton de suppression - toujours visible si propriétaire */}
+                      {(projectOwners[project.id] || project.owner_id === profile?.id) && (
+                        <button
+                          onClick={(e) => handleDeleteClick(e, project)}
+                          className="absolute top-4 right-4 z-10 p-2 hover:bg-red-50 rounded-lg text-red-600 transition-all hover:scale-110 bg-white/80 backdrop-blur-sm shadow-sm"
+                          title="Supprimer le projet"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
+                      
+                      <Link href={`/dashboard/projects/${project.id}`}>
+                        <div className="cursor-pointer">
+                          {/* Header avec priorité */}
+                          <div className="flex items-start justify-between mb-4">
+                            <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(project.status)}`}>
+                              {getStatusLabel(project.status)}
                             </div>
+                            <div className={`w-3 h-3 rounded-full ${getPriorityDot(project.priority)}`} />
+                          </div>
+
+                          {/* Titre */}
+                          <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:vibrant-accent-text transition-colors">
+                            {project.title}
+                          </h3>
+
+                          {/* Description */}
+                          {project.description && (
+                            <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                              {project.description}
+                            </p>
                           )}
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <FileText className="w-4 h-4" />
-                            Voir
+
+                          {/* Footer */}
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                            {project.deadline && (
+                              <div className="flex items-center gap-2 text-xs text-gray-500">
+                                <Clock className="w-4 h-4" />
+                                {new Date(project.deadline).toLocaleDateString("fr-FR", {
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <FileText className="w-4 h-4" />
+                              Voir
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Link>
+                      </Link>
+                    </div>
                   </motion.div>
                 ))}
 
@@ -373,6 +425,36 @@ export default function Dashboard() {
         </div>
       </main>
       <Footer />
+
+      {/* Modal de confirmation de suppression */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-2 text-gray-900">Supprimer le projet ?</h3>
+            <p className="text-gray-600 mb-6">
+              Êtes-vous sûr de vouloir supprimer <strong>"{showDeleteConfirm.title}"</strong> ?
+              <br /><br />
+              Cette action est <strong className="text-red-600">irréversible</strong> et supprimera toutes les données associées.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                disabled={deletingProjectId === showDeleteConfirm.projectId}
+                className="flex-1 glass-card px-4 py-2 text-sm font-semibold text-gray-900 rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={deletingProjectId === showDeleteConfirm.projectId}
+                className="flex-1 glass-card px-4 py-2 text-sm font-semibold text-red-600 rounded-lg hover:shadow-lg transition-all hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingProjectId === showDeleteConfirm.projectId ? 'Suppression...' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

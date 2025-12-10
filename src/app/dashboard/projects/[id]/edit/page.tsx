@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getProject, updateProject } from "@/lib/supabase/client-utils";
+import { getProject, updateProject, getProjectUserRole } from "@/lib/supabase/client-utils";
 
 export default function EditProject() {
   const params = useParams();
@@ -24,6 +24,7 @@ export default function EditProject() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
 
   useEffect(() => {
     loadProject();
@@ -31,6 +32,15 @@ export default function EditProject() {
 
   const loadProject = async () => {
     try {
+      // Vérifier les permissions d'abord
+      const permissions = await getProjectUserRole(projectId);
+      if (!permissions.canEdit) {
+        alert("Vous n'avez pas la permission de modifier ce projet.");
+        router.push(`/dashboard/projects/${projectId}`);
+        return;
+      }
+      setHasPermission(true);
+
       const project = await getProject(projectId);
       
       setFormData({

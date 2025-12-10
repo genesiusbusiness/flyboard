@@ -7,7 +7,8 @@ import { useState } from "react";
 import { ArrowLeft, Save, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { createProjectSpec } from "@/lib/supabase/client-utils";
+import { createProjectSpec, getProjectUserRole } from "@/lib/supabase/client-utils";
+import { useEffect } from "react";
 
 const categories = [
   { value: 'general', label: 'Général', icon: '📄' },
@@ -42,6 +43,27 @@ export default function NewSpecs() {
     },
   });
   const [loading, setLoading] = useState(false);
+  const [checkingPermissions, setCheckingPermissions] = useState(true);
+
+  useEffect(() => {
+    checkPermissions();
+  }, [projectId]);
+
+  const checkPermissions = async () => {
+    try {
+      const permissions = await getProjectUserRole(projectId);
+      if (!permissions.canCreateSpecs) {
+        alert("Vous n'avez pas la permission de créer des cahiers des charges.");
+        router.push(`/dashboard/projects/${projectId}`);
+        return;
+      }
+    } catch (error) {
+      console.error("Erreur lors de la vérification des permissions:", error);
+      router.push(`/dashboard/projects/${projectId}`);
+    } finally {
+      setCheckingPermissions(false);
+    }
+  };
 
   const addItem = (field: "objectives" | "requirements" | "deliverables" | "constraints") => {
     setFormData({

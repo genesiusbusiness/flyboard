@@ -6,7 +6,7 @@ const nextConfig = {
   compress: true,
   // Images (Vercel optimise automatiquement)
   images: {
-    domains: ['xlzrywplyqpyvkcipgei.supabase.co'],
+    domains: ['yxkbvhymsvasknslhpsa.supabase.co'],
   },
   // Trailing slash
   trailingSlash: false,

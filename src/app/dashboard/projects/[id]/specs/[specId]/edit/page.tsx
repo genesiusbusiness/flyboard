@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Save, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getProjectSpec, updateProjectSpec } from "@/lib/supabase/client-utils";
+import { getProjectSpec, updateProjectSpec, getProjectUserRole } from "@/lib/supabase/client-utils";
 
 const categories = [
   { value: 'general', label: 'Général', icon: '📄' },
@@ -46,12 +46,29 @@ export default function EditSpecs() {
   const [loadingSpecs, setLoadingSpecs] = useState(true);
 
   useEffect(() => {
+    checkPermissions();
     if (specId) {
       loadSpecs();
     } else {
       setLoadingSpecs(false);
     }
   }, [projectId, specId]);
+
+  const checkPermissions = async () => {
+    try {
+      const permissions = await getProjectUserRole(projectId);
+      if (!permissions.canEditSpecs) {
+        alert("Vous n'avez pas la permission de modifier des cahiers des charges.");
+        router.push(`/dashboard/projects/${projectId}/specs/${specId}`);
+        return;
+      }
+    } catch (error) {
+      console.error("Erreur lors de la vérification des permissions:", error);
+      router.push(`/dashboard/projects/${projectId}/specs/${specId}`);
+    } finally {
+      setCheckingPermissions(false);
+    }
+  };
 
   const loadSpecs = async () => {
     if (!specId) return;

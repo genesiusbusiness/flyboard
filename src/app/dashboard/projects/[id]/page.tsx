@@ -4,20 +4,33 @@ import { Navigation } from "@/components/Navigation";
 import { Footer } from "@/components/Footer";
 import { GlassCard } from "@/components/GlassCard";
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, Users, Plus, Edit, CheckCircle, XCircle, Clock } from "lucide-react";
+import { ArrowLeft, FileText, Users, Plus, Edit, CheckCircle, XCircle, Clock, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getProject, bootstrapFlyboardProfile, getProjectSpecs, getProjectMembers, getProjectProposals } from "@/lib/supabase/client-utils";
+import { getProject, bootstrapFlyboardProfile, getProjectSpecs, getProjectMembers, getProjectProposals, deleteProject } from "@/lib/supabase/client-utils";
 
 export default function ProjectDetail() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.id as string;
   const supabase = createClient();
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "specs" | "proposals" | "notes">("overview");
   const [canEdit, setCanEdit] = useState(false);
+  const [permissions, setPermissions] = useState<{
+    role: 'owner' | 'manager' | 'editor' | 'viewer' | null;
+    isOwner: boolean;
+    isManager: boolean;
+    isEditor: boolean;
+    isViewer: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+    canCreateProposals: boolean;
+    canCreateNotes: boolean;
+    canManageMembers: boolean;
+  } | null>(null);
   const [proposals, setProposals] = useState<any[]>([]);
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -25,6 +38,8 @@ export default function ProjectDetail() {
   const [loadingSpecs, setLoadingSpecs] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadProject();
@@ -49,12 +64,13 @@ export default function ProjectDetail() {
       const projectData = await getProject(projectId);
       setProject(projectData);
       
-      // Vérifier les permissions d'édition
+      // Charger les permissions de l'utilisateur
+      const userPermissions = await getProjectUserRole(projectId);
+      setPermissions(userPermissions);
+      setCanEdit(userPermissions.canEdit);
+      
       const profile = await bootstrapFlyboardProfile();
       if (profile?.id) {
-        const isOwner = projectData.owner_id === profile.id;
-        const isSuperAdmin = profile.global_role === 'super_admin';
-        setCanEdit(isOwner || isSuperAdmin);
         setCurrentUserId(profile.id);
       }
     } catch (error) {
@@ -258,6 +274,24 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer le projet "${project.title}" ? Cette action est irréversible et supprimera toutes les données associées (propositions, spécifications, notes, membres).`)) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteProject(projectId);
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error('Erreur lors de la suppression:', error);
+      alert('Erreur lors de la suppression du projet: ' + (error.message || 'Erreur inconnue'));
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   if (loading || !project) {
     return (
       <div className="min-h-screen light-blue-bg">
@@ -301,7 +335,7 @@ export default function ProjectDetail() {
               )}
             </div>
             <div className="flex items-center gap-3 mt-4 md:mt-0">
-              {canEdit && (
+              {permissions?.canEdit && (
                 <Link
                   href={`/dashboard/projects/${projectId}/edit`}
                   className="glass-card px-4 py-2 text-sm font-semibold text-gray-900 rounded-full flex items-center gap-2 hover:shadow-lg transition-all"
@@ -309,6 +343,16 @@ export default function ProjectDetail() {
                   <Edit className="w-4 h-4" />
                   Modifier
                 </Link>
+              )}
+              {permissions?.canDelete && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={deleting}
+                  className="glass-card px-4 py-2 text-sm font-semibold text-red-600 rounded-full flex items-center gap-2 hover:shadow-lg transition-all hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Supprimer
+                </button>
               )}
               <Link
                 href={`/dashboard/projects/${projectId}/specs`}
@@ -425,12 +469,14 @@ export default function ProjectDetail() {
                     <Users className="w-5 h-5" />
                     Membres
                   </h3>
-                  <Link
-                    href={`/dashboard/projects/${projectId}/members`}
-                    className="text-xs text-purple-600 hover:text-purple-700 font-medium"
-                  >
-                    Gérer →
-                  </Link>
+                  {permissions?.canManageMembers && (
+                    <Link
+                      href={`/dashboard/projects/${projectId}/members`}
+                      className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      Gérer →
+                    </Link>
+                  )}
                 </div>
                 
                 {loadingMembers ? (
@@ -440,13 +486,15 @@ export default function ProjectDetail() {
                 ) : members.length === 0 ? (
                   <div className="text-center py-4">
                     <p className="text-sm text-gray-500 mb-3">Aucun membre assigné</p>
-                    <Link
-                      href={`/dashboard/projects/${projectId}/members`}
-                      className="glass-button-accent px-4 py-2 text-xs font-semibold text-white rounded-full inline-flex items-center gap-2"
-                    >
-                      <Plus className="w-3 h-3" />
-                      Ajouter un membre
-                    </Link>
+                    {permissions?.canManageMembers && (
+                      <Link
+                        href={`/dashboard/projects/${projectId}/members`}
+                        className="glass-button-accent px-4 py-2 text-xs font-semibold text-white rounded-full inline-flex items-center gap-2"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Ajouter un membre
+                      </Link>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -486,17 +534,29 @@ export default function ProjectDetail() {
                 )}
               </GlassCard>
 
-              {canEdit && (
+              {(permissions?.canEdit || permissions?.canDelete) && (
                 <GlassCard>
                   <h3 className="text-lg font-semibold mb-4">Actions</h3>
                   <div className="space-y-2">
-                    <Link
-                      href={`/dashboard/projects/${projectId}/edit`}
-                      className="w-full glass-card px-4 py-2 text-sm font-semibold text-gray-900 rounded-lg flex items-center justify-center gap-2 hover:shadow-lg transition-all"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Modifier le projet
-                    </Link>
+                    {permissions?.canEdit && (
+                      <Link
+                        href={`/dashboard/projects/${projectId}/edit`}
+                        className="w-full glass-card px-4 py-2 text-sm font-semibold text-gray-900 rounded-lg flex items-center justify-center gap-2 hover:shadow-lg transition-all"
+                      >
+                        <Edit className="w-4 h-4" />
+                        Modifier le projet
+                      </Link>
+                    )}
+                    {permissions?.canDelete && (
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        disabled={deleting}
+                        className="w-full glass-card px-4 py-2 text-sm font-semibold text-red-600 rounded-lg flex items-center justify-center gap-2 hover:shadow-lg transition-all hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        {deleting ? 'Suppression...' : 'Supprimer le projet'}
+                      </button>
+                    )}
                   </div>
                 </GlassCard>
               )}
@@ -507,13 +567,15 @@ export default function ProjectDetail() {
             <div>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-semibold">Cahiers des charges</h2>
-                <Link
-                  href={`/dashboard/projects/${projectId}/specs/new`}
-                  className="glass-button-accent px-4 py-2 text-sm font-semibold text-white rounded-full flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Nouveau cahier des charges
-                </Link>
+                {permissions?.canCreateSpecs && (
+                  <Link
+                    href={`/dashboard/projects/${projectId}/specs/new`}
+                    className="glass-button-accent px-4 py-2 text-sm font-semibold text-white rounded-full flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Nouveau cahier des charges
+                  </Link>
+                )}
               </div>
 
               {loadingSpecs ? (
@@ -526,13 +588,15 @@ export default function ProjectDetail() {
                   <div className="text-center py-12">
                     <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                     <p className="text-gray-600 mb-4">Aucun cahier des charges créé pour ce projet.</p>
-                    <Link
-                      href={`/dashboard/projects/${projectId}/specs/new`}
-                      className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
-                    >
-                      <Plus className="w-5 h-5" />
-                      Créer le premier cahier des charges
-                    </Link>
+                    {permissions?.canCreateSpecs && (
+                      <Link
+                        href={`/dashboard/projects/${projectId}/specs/new`}
+                        className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Créer le premier cahier des charges
+                      </Link>
+                    )}
                   </div>
                 </GlassCard>
               ) : (
@@ -581,13 +645,15 @@ export default function ProjectDetail() {
             <div>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-semibold">Propositions</h2>
-                <Link
-                  href={`/dashboard/projects/${projectId}/proposals/new`}
-                  className="glass-button-accent px-4 py-2 text-sm font-semibold text-white rounded-full flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Nouvelle proposition
-                </Link>
+                {permissions?.canCreateProposals && (
+                  <Link
+                    href={`/dashboard/projects/${projectId}/proposals/new`}
+                    className="glass-button-accent px-4 py-2 text-sm font-semibold text-white rounded-full flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Nouvelle proposition
+                  </Link>
+                )}
               </div>
 
               {loadingProposals ? (
@@ -600,13 +666,15 @@ export default function ProjectDetail() {
                   <div className="text-center py-12">
                     <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                     <p className="text-gray-600 mb-4">Aucune proposition pour ce projet</p>
-                    <Link
-                      href={`/dashboard/projects/${projectId}/proposals/new`}
-                      className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
-                    >
-                      <Plus className="w-5 h-5" />
-                      Créer la première proposition
-                    </Link>
+                    {permissions?.canCreateProposals && (
+                      <Link
+                        href={`/dashboard/projects/${projectId}/proposals/new`}
+                        className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Créer la première proposition
+                      </Link>
+                    )}
                   </div>
                 </GlassCard>
               ) : (
@@ -730,27 +798,67 @@ export default function ProjectDetail() {
                   href={`/dashboard/projects/${projectId}/notes`}
                   className="glass-button-accent px-4 py-2 text-sm font-semibold text-white rounded-full flex items-center gap-2"
                 >
-                  <Plus className="w-4 h-4" />
                   Voir toutes les notes
                 </Link>
               </div>
               <GlassCard>
                 <p className="text-gray-600 mb-4">
-                  Partagez vos notes, idées et rappels pour ce projet. Tous les membres peuvent voir et créer des notes.
+                  {permissions?.canCreateNotes 
+                    ? "Partagez vos notes, idées et rappels pour ce projet."
+                    : "Consultez les notes, idées et rappels de ce projet. Vous n'avez pas la permission de créer des notes."}
                 </p>
-                <Link
-                  href={`/dashboard/projects/${projectId}/notes`}
-                  className="glass-button-accent px-4 py-2 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Créer une note
-                </Link>
+                {permissions?.canCreateNotes && (
+                  <Link
+                    href={`/dashboard/projects/${projectId}/notes`}
+                    className="glass-button-accent px-4 py-2 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Créer une note
+                  </Link>
+                )}
               </GlassCard>
             </div>
           )}
         </div>
       </main>
       <Footer />
+
+      {/* Modal de confirmation de suppression */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-2 text-gray-900">Supprimer le projet ?</h3>
+            <p className="text-gray-600 mb-6">
+              Êtes-vous sûr de vouloir supprimer <strong>"{project.title}"</strong> ?
+              <br /><br />
+              Cette action est <strong className="text-red-600">irréversible</strong> et supprimera :
+              <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                <li>Toutes les propositions</li>
+                <li>Tous les cahiers des charges</li>
+                <li>Toutes les notes</li>
+                <li>Tous les membres</li>
+                <li>Le projet lui-même</li>
+              </ul>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="flex-1 glass-card px-4 py-2 text-sm font-semibold text-gray-900 rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteProject}
+                disabled={deleting}
+                className="flex-1 glass-card px-4 py-2 text-sm font-semibold text-red-600 rounded-lg hover:shadow-lg transition-all hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Suppression...' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

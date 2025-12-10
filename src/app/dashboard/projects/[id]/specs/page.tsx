@@ -8,7 +8,7 @@ import { ArrowLeft, Plus, Edit, Trash2, FileText, Filter } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { getProjectSpecs, deleteProjectSpec } from "@/lib/supabase/client-utils";
+import { getProjectSpecs, deleteProjectSpec, getProjectUserRole } from "@/lib/supabase/client-utils";
 
 interface Spec {
   id: string;
@@ -68,10 +68,21 @@ export default function SpecsPage() {
   const [specs, setSpecs] = useState<Spec[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [permissions, setPermissions] = useState<any>(null);
 
   useEffect(() => {
+    loadPermissions();
     loadSpecs();
   }, [projectId, selectedCategory]);
+
+  const loadPermissions = async () => {
+    try {
+      const userPermissions = await getProjectUserRole(projectId);
+      setPermissions(userPermissions);
+    } catch (error) {
+      console.error("Erreur lors du chargement des permissions:", error);
+    }
+  };
 
   const loadSpecs = async () => {
     setLoading(true);
@@ -128,6 +139,7 @@ export default function SpecsPage() {
               <Plus className="w-5 h-5" />
               Nouveau cahier des charges
             </Link>
+          )}
           </div>
 
           {/* Filtres par catégorie */}
@@ -169,13 +181,15 @@ export default function SpecsPage() {
                     : `Aucun cahier des charges dans la catégorie "${getCategoryLabel(selectedCategory)}"`
                   }
                 </p>
-                <Link
-                  href={`/dashboard/projects/${projectId}/specs/new`}
-                  className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
-                >
-                  <Plus className="w-5 h-5" />
-                  Créer le premier cahier des charges
-                </Link>
+                {permissions?.canCreateSpecs && (
+                  <Link
+                    href={`/dashboard/projects/${projectId}/specs/new`}
+                    className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Créer le premier cahier des charges
+                  </Link>
+                )}
               </div>
             </GlassCard>
           ) : (

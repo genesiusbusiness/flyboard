@@ -7,7 +7,7 @@ import { ArrowLeft, Plus, Edit, Trash2, Pin, PinOff, Lightbulb, FileText, CheckS
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { getProjectNotes, createProjectNote, updateProjectNote, deleteProjectNote } from "@/lib/supabase/client-utils";
+import { getProjectNotes, createProjectNote, updateProjectNote, deleteProjectNote, getProjectUserRole } from "@/lib/supabase/client-utils";
 
 interface Note {
   id: string;
@@ -84,20 +84,24 @@ function NoteCard({
                 <PinOff className="w-4 h-4 text-slate-400" />
               )}
             </button>
-            <button
-              onClick={() => onEdit(note)}
-              className="p-2 hover:bg-white/50 rounded-lg transition"
-              title="Modifier"
-            >
-              <Edit className="w-4 h-4 text-slate-600" />
-            </button>
-            <button
-              onClick={() => onDelete(note.id)}
-              className="p-2 hover:bg-white/50 rounded-lg transition"
-              title="Supprimer"
-            >
-              <Trash2 className="w-4 h-4 text-red-600" />
-            </button>
+            {(permissions?.canEdit || permissions?.isOwner) && (
+              <button
+                onClick={() => onEdit(note)}
+                className="p-2 hover:bg-white/50 rounded-lg transition"
+                title="Modifier"
+              >
+                <Edit className="w-4 h-4 text-slate-600" />
+              </button>
+            )}
+            {(permissions?.canEdit || permissions?.isOwner) && (
+              <button
+                onClick={() => onDelete(note.id)}
+                className="p-2 hover:bg-white/50 rounded-lg transition"
+                title="Supprimer"
+              >
+                <Trash2 className="w-4 h-4 text-red-600" />
+              </button>
+            )}
           </div>
         </div>
       </GlassCard>
@@ -112,6 +116,7 @@ export default function ProjectNotesPage() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [permissions, setPermissions] = useState<any>(null);
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -121,7 +126,17 @@ export default function ProjectNotesPage() {
 
   useEffect(() => {
     loadNotes();
+    loadPermissions();
   }, [projectId]);
+
+  const loadPermissions = async () => {
+    try {
+      const userPermissions = await getProjectUserRole(projectId);
+      setPermissions(userPermissions);
+    } catch (error) {
+      console.error("Erreur lors du chargement des permissions:", error);
+    }
+  };
 
   const loadNotes = async () => {
     try {
@@ -249,17 +264,19 @@ export default function ProjectNotesPage() {
               </h1>
               <p className="text-gray-600">Partagez vos notes et idées pour ce projet</p>
             </div>
-            <button
-              onClick={() => {
-                setEditingNote(null);
-                setFormData({ title: "", content: "", note_type: "note", is_pinned: false });
-                setShowAddModal(true);
-              }}
-              className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              Nouvelle note
-            </button>
+            {permissions?.canCreateNotes && (
+              <button
+                onClick={() => {
+                  setEditingNote(null);
+                  setFormData({ title: "", content: "", note_type: "note", is_pinned: false });
+                  setShowAddModal(true);
+                }}
+                className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Nouvelle note
+              </button>
+            )}
           </div>
 
           {loading ? (
@@ -318,17 +335,19 @@ export default function ProjectNotesPage() {
                   <div className="text-center py-12">
                     <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                     <p className="text-gray-600 mb-4">Aucune note pour ce projet</p>
-                    <button
-                      onClick={() => {
-                        setEditingNote(null);
-                        setFormData({ title: "", content: "", note_type: "note", is_pinned: false });
-                        setShowAddModal(true);
-                      }}
-                      className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
-                    >
-                      <Plus className="w-5 h-5" />
-                      Créer la première note
-                    </button>
+                    {permissions?.canCreateNotes && (
+                      <button
+                        onClick={() => {
+                          setEditingNote(null);
+                          setFormData({ title: "", content: "", note_type: "note", is_pinned: false });
+                          setShowAddModal(true);
+                        }}
+                        className="glass-button-accent px-6 py-3 text-sm font-semibold text-white rounded-full inline-flex items-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Créer la première note
+                      </button>
+                    )}
                   </div>
                 </GlassCard>
               )}
@@ -336,7 +355,7 @@ export default function ProjectNotesPage() {
           )}
 
           {/* Modal d'ajout/édition */}
-          {showAddModal && (
+          {showAddModal && permissions?.canCreateNotes && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}

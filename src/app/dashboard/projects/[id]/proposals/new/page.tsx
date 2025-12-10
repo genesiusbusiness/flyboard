@@ -8,6 +8,7 @@ import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getProjectUserRole } from "@/lib/supabase/client-utils";
 
 export default function NewProposal() {
   const params = useParams();
@@ -23,6 +24,8 @@ export default function NewProposal() {
     estimated_cost: "",
   });
   const [loading, setLoading] = useState(false);
+  const [permissions, setPermissions] = useState<any>(null);
+  const [checkingPermissions, setCheckingPermissions] = useState(true);
 
   useEffect(() => {
     loadProject();
@@ -30,6 +33,15 @@ export default function NewProposal() {
 
   const loadProject = async () => {
     try {
+      // Vérifier les permissions
+      const userPermissions = await getProjectUserRole(projectId);
+      setPermissions(userPermissions);
+      
+      if (!userPermissions.canCreateProposals) {
+        router.push(`/dashboard/projects/${projectId}`);
+        return;
+      }
+
       const { data: projectData, error: projectError } = await supabase
         .from('flyboard_projects')
         .select('id, title')
@@ -44,6 +56,8 @@ export default function NewProposal() {
       setProject(projectData);
     } catch (error) {
       console.error("Erreur lors du chargement du projet:", error);
+    } finally {
+      setCheckingPermissions(false);
     }
   };
 

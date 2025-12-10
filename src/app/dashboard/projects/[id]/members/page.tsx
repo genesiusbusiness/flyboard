@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
-import { getProjectMembers, bootstrapFlyboardProfile, addProjectMember, updateProjectMemberPermissions, removeProjectMember, searchUsers, getAllUsers, getProject } from "@/lib/supabase/client-utils";
+import { getProjectMembers, bootstrapFlyboardProfile, addProjectMember, updateProjectMemberPermissions, removeProjectMember, searchUsers, getAllUsers, getProject, getProjectUserRole } from "@/lib/supabase/client-utils";
 
 interface Member {
   id: string;
@@ -53,6 +53,7 @@ export default function ProjectMembersPage() {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedRole, setSelectedRole] = useState("viewer");
   const [canManage, setCanManage] = useState(false);
+  const [permissions, setPermissions] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -65,26 +66,29 @@ export default function ProjectMembersPage() {
   const loadData = async () => {
     try {
       // Charger les membres du projet
+      // Tous les membres du projet (n'importe quel rôle) peuvent voir tous les autres membres
       const membersList = await getProjectMembers(projectId);
       setMembers(membersList || []);
 
-      // Vérifier les permissions
+      // Vérifier les permissions pour la gestion (ajout/modification/suppression)
+      const userPermissions = await getProjectUserRole(projectId);
+      setPermissions(userPermissions);
+      setCanManage(userPermissions.canManageMembers);
+
+      // Si super admin, charger tous les utilisateurs
       const profile = await bootstrapFlyboardProfile();
-      const project = await getProject(projectId);
-      
       if (profile?.global_role === 'super_admin') {
         const usersList = await getAllUsers();
         setAllUsers(usersList || []);
-        setCanManage(true);
-      } else if (project?.owner_id === profile?.id) {
-        setCanManage(true);
-      } else {
-        setCanManage(false);
       }
 
       setLoading(false);
-    } catch (error) {
-      console.error("Erreur:", error);
+    } catch (error: any) {
+      // Si l'utilisateur n'est pas membre, afficher un message clair
+      if (error?.message?.includes('membre')) {
+        alert(error.message);
+        router.push(`/dashboard/projects/${projectId}`);
+      }
       setLoading(false);
     }
   };
@@ -93,14 +97,7 @@ export default function ProjectMembersPage() {
     if (!selectedUserId || !selectedRole || !selectedUser) return;
 
     try {
-      console.log("➕ Ajout d'un membre:", {
-        member_id: selectedUserId,
-        project_role: selectedRole,
-        user: selectedUser
-      });
-
       await addProjectMember(projectId, selectedUserId, selectedRole);
-      console.log("✅ Membre ajouté avec succès");
 
       await loadData();
       setShowAddModal(false);
@@ -110,7 +107,6 @@ export default function ProjectMembersPage() {
       setSearchQuery("");
       setSearchResults([]);
     } catch (error: any) {
-      console.error("❌ Erreur lors de l'ajout:", error);
       alert(error.message || "Erreur lors de l'ajout du membre");
     }
   };
@@ -172,21 +168,16 @@ export default function ProjectMembersPage() {
 
     setIsSearching(true);
     try {
-      console.log(`🔍 Recherche d'utilisateurs pour: "${query}"`);
       const users = await searchUsers(query);
-      console.log(`✅ Résultats bruts:`, users);
-      console.log(`📊 Nombre d'utilisateurs trouvés: ${users?.length || 0}`);
       
       // Filtrer les utilisateurs déjà membres
       const filtered = (users || []).filter(
         (user: User) => !members.some(m => m.member.id === user.id)
       );
       
-      console.log(`📋 Après filtrage (déjà membres): ${filtered.length} utilisateurs disponibles`);
       setSearchResults(filtered);
     } catch (error) {
-      console.error("❌ Erreur lors de la recherche:", error);
-      alert("Erreur lors de la recherche. Vérifiez la console pour plus de détails.");
+      alert("Erreur lors de la recherche. Veuillez réessayer.");
     } finally {
       setIsSearching(false);
     }
