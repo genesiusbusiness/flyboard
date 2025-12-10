@@ -35,6 +35,7 @@ function NoteCard({
   getNoteTypeIcon,
   getNoteTypeColor,
   getNoteTypeLabel,
+  permissions,
 }: {
   note: Note;
   onEdit: (note: Note) => void;
@@ -43,6 +44,7 @@ function NoteCard({
   getNoteTypeIcon: (type: string) => JSX.Element;
   getNoteTypeColor: (type: string) => string;
   getNoteTypeLabel: (type: string) => string;
+  permissions: any;
 }) {
   return (
     <motion.div
@@ -301,6 +303,7 @@ export default function ProjectNotesPage() {
                         getNoteTypeIcon={getNoteTypeIcon}
                         getNoteTypeColor={getNoteTypeColor}
                         getNoteTypeLabel={getNoteTypeLabel}
+                        permissions={permissions}
                       />
                     ))}
                   </div>
@@ -324,6 +327,7 @@ export default function ProjectNotesPage() {
                         getNoteTypeIcon={getNoteTypeIcon}
                         getNoteTypeColor={getNoteTypeColor}
                         getNoteTypeLabel={getNoteTypeLabel}
+                        permissions={permissions}
                       />
                     ))}
                   </div>
